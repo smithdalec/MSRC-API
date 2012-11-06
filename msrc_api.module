@@ -1,0 +1,117 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function msrc_export_menu() {
+  // /msrc-export/[entity type]
+	$items['msrc-export/%'] = array(
+    'page callback' => 'export_list',
+    'page arguments' => array(1),
+    'access callback' => 'msrc_export_access',
+    'type' => MENU_CALLBACK,
+  );
+  // /msrc-export/[entity type]/[entity id]
+  $items['msrc-export/%/%'] = array(
+    'page callback' => 'export_single',
+    'page arguments' => array(1,2),
+    'access callback' => 'msrc_export_access',
+    'type' => MENU_CALLBACK,
+  );
+  $items['msrc-export/instance/%'] = array(
+    'page callback' => 'export_instance',
+    'page arguments' => array(2),
+    'access callback' => 'msrc_export_access',
+    'type' => MENU_CALLBACK,
+  );
+  $items['msrc-export/field/%'] = array(
+    'page callback' => 'export_field',
+    'page arguments' => array(2),
+    'access callback' => 'msrc_export_access',
+    'type' => MENU_CALLBACK,
+  );
+	return $items;
+}
+
+function msrc_export_access() {
+  $ip = $_SERVER['REMOTE_ADDR'];
+
+  $allowed_ips = array(
+    '::1',
+    '127.0.0.1',
+    '128.186.73.',
+    '144.174.51.',
+  );
+
+  foreach($allowed_ips as $allowed_ip) {
+    if (preg_match('/' . $allowed_ip . '/', $ip)) {
+      return TRUE;
+    }
+  }
+
+  drupal_set_message('You are not authorized to view this content. Your recorded IP address is ' . $ip, 'error');
+  return FALSE;
+}
+
+function export_list($entity_type) {
+  $entity_info = entity_get_info($entity_type);
+
+  if (!$entity_info) {
+    drupal_add_http_header('Status', '404 Not Found');
+    return drupal_json_output('Error: invalid entity type specified');
+  }
+
+  $query_params = drupal_get_query_parameters();
+  $id = $entity_info['entity keys']['id'];
+  $revision = $entity_info['entity keys']['revision'];
+  // Whether or not the entity key exists as a column in the entity table
+  $rev_col = in_array($revision, $entity_info['schema_fields_sql']['base table']);
+  $bundle = $entity_info['entity keys']['bundle'];
+  // Whether or not the bundle key exists as a column in the entity table
+  $bundle_col = in_array($bundle, $entity_info['schema_fields_sql']['base table']);
+  $entity_ids = array();
+
+  $query = db_select($entity_info['base table'], 'e');
+  $query->fields('e', array($id));
+  if ($revision && $rev_col) $query->addField('e', $revision);
+  if ($bundle && $bundle_col) $query->addField('e', $bundle);
+  foreach ($query_params as $field => $value) {
+    $query->condition($field, $value);
+  }
+  $result = $query->execute();
+
+  while ($row = $result->fetchAssoc()) {
+    $entity_ids[$row[$id]][$id] = $row[$id];
+    if ($revision) $entity_ids[$row[$id]][$revision] = $row[$revision];
+    if ($bundle) $entity_ids[$row[$id]][$bundle] = $row[$bundle];
+  }
+
+  drupal_json_output($entity_ids);
+}
+
+function export_single($entity_type, $entity_id) {
+  $entity = reset(entity_load($entity_type, array($entity_id)));
+  drupal_json_output($entity);
+}
+
+function export_instance($field_name) {
+  $instance_info = field_info_instance('node', $field_name, 'biblio');
+
+  if ($instance_info) {
+    drupal_json_output($instance_info);
+  }
+  else {
+    drupal_not_found();
+  }
+}
+
+function export_field($field_name) {
+  $field_info = field_info_field($field_name);
+
+  if ($field_info) {
+    drupal_json_output($field_info);
+  }
+  else {
+    drupal_not_found();
+  }
+}
