@@ -39,18 +39,11 @@ class MSRCEndpointHelper {
 	 */
 	protected function outputJSON()
 	{
-		if (!empty($this->errors)) {
+		if (!empty($this->errors))
 			$errors = array('errors' => $this->errors);
-		}
-		else {
-			$errors = array();
-		}
+		else $errors = array();
 
-		$output = array_merge(
-			$this->metadata,
-			$errors,
-			$this->data);
-
+		$output = array_merge($this->metadata, $errors, $this->data);
 		drupal_json_output($output);
 	}
 }
