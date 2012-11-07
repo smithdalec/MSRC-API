@@ -21,6 +21,13 @@ class MSRCEndpointHelper {
 	 */
 	protected $errors = array();
 
+	/**
+	 * Mapping of drupal field names to JSON-friendly names
+	 * Just a PHP array version of field_map.json
+	 * @var array
+	 */
+	protected $fieldMap = array();
+
 
 	/**
 	 * Constructor
@@ -32,6 +39,9 @@ class MSRCEndpointHelper {
 			'uri'          => $_SERVER['HTTP_HOST'] . '/' . request_uri(),
 			'query_string' => $_SERVER['QUERY_STRING'],
 		);
+
+		$path = drupal_get_path('module', 'msrc_api') . '/field_map.json';
+		$this->fieldMap = json_decode(file_get_contents($path));
 	}
 
 	/**
@@ -45,6 +55,29 @@ class MSRCEndpointHelper {
 
 		$output = array_merge($this->metadata, $errors, $this->data);
 		drupal_json_output($output);
+	}
+
+	/**
+	 * Get the JSON-friendly field name associated with a Drupal field name
+	 * in field_map.json
+	 * @param  string $drupal_field The name of the Drupal field
+	 * @return string               The name of the associated JSON field
+	 */
+	protected function getJSONField($drupal_field)
+	{
+		return $this->fieldMap[$drupal_field];
+	}
+
+	/**
+	 * Get the Drupal field name associated with a JSON field name in
+	 * field_map.json
+	 * @param  string $JSON_field The name of the JSON field
+	 * @return string             The name of the associated Drupal field
+	 */
+	protected function getDrupalField($JSON_field)
+	{
+		$flipped_map = array_flip($this->fieldMap);
+		return $flipped_map[$JSON_field];
 	}
 }
 
@@ -79,17 +112,61 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		$biblio = biblio_load($this->bid);
 		// Send 404 if invalid ID was given
 		if (!$biblio) return drupal_not_found();
-		$this->data['document'] = $biblio;
+
+		// Set the metadata wrapper for easy getting/setting of entity values
+		$wrapper = biblio_wrapper($biblio);
+
+		foreach ($this->fieldMap as $drupal_field => $json_field) {
+			$value = $this->getValue($wrapper->$drupal_field->value());
+			if ($value) {
+				$this->data['document'][$json_field] = $value;
+			}
+		}
+
 		// Output the JSON
 		$this->outputJSON();
 	}
 
-	private function getFieldMap()
+	/**
+	 * Pulls the raw value of a given Drupal field structure. Particularly
+	 * useful when getting the value of a multivalued/multi-keyed field
+	 * @param  mixed $initial_value The original field structure or value
+	 * @return mixed                Raw value, or array of raw values (if
+	 *                                  a multivalued field was given)
+	 */
+	private function getValue($initial_value)
 	{
-		// drupal_field_name => JSON_field_name
-		$map = array(
+		// We don't want to display empty values in our JSON output
+		if (empty($initial_value)) return FALSE;
 
-		);
+		if (is_array($initial_value)) {
+			// Some Drupal field formatters keep the actual value in an array
+			// key called 'value' that's an extra layer deep in the field array
+			if (isset($initial_value['value'])) {
+				$value = $initial_value['value'];
+			}
+			else {
+				// We must be dealing with a multivalued property
+				foreach ($initial_value as $atomic_value) {
+					if (is_object($atomic_value)) {
+						if (isset($atomic_value->vocabulary_machine_name)) {
+							// We have a keyword
+							$value[] = $atomic_value->name;
+						}
+						if (isset($atomic_value->biblio_contributor_name)) {
+							// We have a biblio contributor entity
+							$wrapper = biblio_wrapper($atomic_value, 'biblio_contributor');
+							$value[] = $wrapper->biblio_contributor_name->value();
+						}
+					}
+				}
+			}
+		}
+		else {
+			// Regular values (non-multivalued strings, integers, etc.)
+			$value = $initial_value;
+		}
+		return $value;
 	}
 }
 
