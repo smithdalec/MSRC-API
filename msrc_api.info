@@ -1,3 +1,4 @@
 name = MSRC API
 description = Exposes MSRC's Biblio entity data via an endpoint
 core = 7.x
+files[] = endpoint.class.php

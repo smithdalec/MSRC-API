@@ -19,67 +19,17 @@ function msrc_api_menu() {
 }
 
 /**
- * Shows all Biblio IDs based upon query params
+ * Callback function for hook_menu().
  */
 function _msrc_api_list() {
-  $query_params = drupal_get_query_parameters();
-  $fields = field_info_fields();
-  $errors = array();
-  $ids = array();
-
-  // We don't want non-existent fields in our query, or exceptions will be thrown
-  foreach($query_params as $field => $value) {
-    if (!isset($fields[$field])) {
-      unset($query_params[$field]);
-      $errors[] = 'Invalid field: ' . $field;
-    }
-  }
-
-  // Get all biblio entities that match our query string params
-  $query = new EntityFieldQuery();
-  $query->entityCondition('entity_type', 'biblio');
-  foreach ($query_params as $field => $value) {
-    $query->fieldCondition($field, 'value', $value, 'like');
-  }
-
-  $result = reset($query->execute());
-
-  // Create an array of IDs from the result
-  foreach ($result as $entity_data) {
-    $ids[] = $entity_data->bid;
-  }
-
-  _msrc_api_json_output(array('ids' => $ids), $errors);
+  $endpoint = new MSRCListHelper();
+  $endpoint->showList();
 }
 
 /**
- * Shows a single Biblio Entity in JSON format
- * @param  [type] $bid [description]
- * @return [type]      [description]
+ * Callback function for hook_menu().
  */
 function _msrc_api_single($bid) {
-  $biblio = reset(entity_load('biblio', array($bid)));
-  if (!$biblio) return drupal_not_found();
-  _msrc_api_json_output(array('document' => $biblio));
-}
-
-/**
- * Print out JSON data for a request
- * @param  array  $data   Array of keys/values to include in the JSON output
- * @param  array $errors Array of errors to pass
- */
-function _msrc_api_json_output($data, $errors = array()) {
-  $json = array(
-    'request_time' => REQUEST_TIME,
-    'query_string' => $_SERVER['HTTP_HOST'] . '/' . request_uri(),
-    'uri'          => $_SERVER['QUERY_STRING'],
-  );
-  if (empty($errors)) {
-    $json = array_merge($json, $data);
-  }
-  else {
-    $json['errors'] = $errors;
-  }
-
-  drupal_json_output($json);
+  $endpoint = new MSRCSingleRecordHelper($bid);
+  $endpoint->showRecord();
 }
