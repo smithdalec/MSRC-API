@@ -40,6 +40,7 @@ class MSRCEndpointHelper {
 			'query_string' => $_SERVER['QUERY_STRING'],
 		);
 
+		// Put our JSON file of the field mapping in our fieldMap property
 		$path = drupal_get_path('module', 'msrc_api') . '/field_map.json';
 		$this->fieldMap = json_decode(file_get_contents($path));
 	}

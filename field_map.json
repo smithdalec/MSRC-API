@@ -1,5 +1,5 @@
 {
-	"bid"                             : "MSRCDocumentID",
+	"bid"                             : "msrcID",
 	"publication_type"                : "documentType",
 	"created"                         : "created",
 	"changed"                         : "changed",
