@@ -120,6 +120,7 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		foreach ($this->fieldMap as $drupal_field => $json_field) {
 			$value = $this->getValue($wrapper->$drupal_field->value());
 			if ($value) {
+				$this->modifyValue($json_field, $value);
 				$this->data['document'][$json_field] = $value;
 			}
 		}
@@ -168,6 +169,23 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 			$value = $initial_value;
 		}
 		return $value;
+	}
+
+	private function modifyValue($property, &$value)
+	{
+		switch ($property) {
+			// Convert timestamps to ISO-8601 - (e.g. 1999-07-01T19:30:45+10:00)
+			case 'created':
+			case 'changed':
+			case 'startDate':
+			case 'endDate':
+				$value = date('Y-m-d\TG:i:sP', $value);
+				break;
+
+			default:
+				# code...
+				break;
+		}
 	}
 }
 
