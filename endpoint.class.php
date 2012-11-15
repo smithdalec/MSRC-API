@@ -36,7 +36,7 @@ class MSRCEndpointHelper {
 	{
 		$this->metadata = array(
 			'request_time' => REQUEST_TIME,
-			'uri'          => $_SERVER['HTTP_HOST'] . '/' . request_uri(),
+			'uri'          => $_SERVER['HTTP_HOST'] . request_uri(),
 			'query_string' => $_SERVER['QUERY_STRING'],
 		);
 
@@ -90,10 +90,11 @@ class MSRCEndpointHelper {
 class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 
 	/**
-	 * Biblio ID of the Record to display
-	 * @var integer
+	 * Entity Metadata Wrapper for our Biblio entity
+	 * Useful for easy getting/setting of entity property values
+	 * @var object
 	 */
-	private $bid = 0;
+	private $wrapper;
 
 	/**
 	 * Constructor
@@ -101,7 +102,12 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 	public function __construct($bid)
 	{
 		parent::__construct();
-		$this->bid = $bid;
+
+		$biblio = biblio_load($bid);
+		// Send 404 if invalid ID was given
+		if (!$biblio) return drupal_not_found();
+
+		$this->wrapper = biblio_wrapper($biblio);
 	}
 
 	/**
@@ -109,21 +115,17 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 	 */
 	public function showRecord()
 	{
-		// Create biblio entity
-		$biblio = biblio_load($this->bid);
-		// Send 404 if invalid ID was given
-		if (!$biblio) return drupal_not_found();
-
-		// Set the metadata wrapper for easy getting/setting of entity values
-		$wrapper = biblio_wrapper($biblio);
-
-		foreach ($this->fieldMap as $drupal_field => $json_field) {
-			$value = $this->getValue($wrapper->$drupal_field->value());
-			if ($value) {
-				$this->modifyValue($json_field, $value);
-				$this->data['document'][$json_field] = $value;
+		foreach ($this->fieldMap as $field_type => $field_map) {
+			foreach ($field_map as $drupal_field => $json_field) {
+				$value = $this->getValue($this->wrapper->$drupal_field->value());
+				if ($value) {
+					$this->modifyValue($json_field, $value);
+					$this->data[$field_type][$json_field] = $value;
+				}
 			}
 		}
+
+		$this->setAdditionalFields();
 
 		// Output the JSON
 		$this->outputJSON();
@@ -186,6 +188,54 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 				# code...
 				break;
 		}
+	}
+
+	private function setAdditionalFields()
+	{
+		// Set Contributor IDs
+		foreach($this->wrapper->biblio_primary_contributors as $contributor) {
+			$this->data['record']['creators'][] = $contributor->cid->value();
+		}
+
+		// Set A.nnotate URL
+		$attachment = $this->wrapper->field_attatchment->value();
+		$attach_set = isset($attachment[0]['fid']);
+		if ($attachment && $attach_set && $fid = $attachment[0]['fid']) {
+			if ($url = $this->getAnnotateURL($fid))
+			$this->data['record']['annotations'] = $url;
+		}
+	}
+
+	private function getAnnotateURL($fid)
+	{
+		if (!module_exists('a_nnotate')) return FALSE;
+
+		//Get the Sync Record (with A.nnotate Document ID)
+		$sync_rec = _a_nnotate_sync_entity($fid);
+
+		//Get the user for which to Annotate the document
+		if (a_nnotate_obj('config')->user_sync_mode == 'single_user') {
+			$user_email = a_nnotate_obj('config')->user_sync_single_user;
+		}
+		else {
+			global $user;
+			$user_email = $user->mail;
+		}
+
+		$c = $sync_rec->aid->c;
+		$d = $sync_rec->aid->d;
+		$annotate_user = a_nnotate_obj('config')->annotate_owner_username;
+		$aac = a_nnotate_obj('actions')
+			->get_anonymous_access_code($c, $d, $annotate_user);
+		$params = array(
+			'c'        => $c,
+			'd'        => $d,
+			'asig'     => $user_email,
+			'aac'      => $aac,
+		);
+		$url = a_nnotate_obj('config')->api_url . 'pdfnotate.php?';
+		$query_string = a_nnotate_obj('client')->url_serialize($params);
+		return $url . $query_string;
 	}
 }
 
