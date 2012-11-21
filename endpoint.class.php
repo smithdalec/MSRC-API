@@ -173,6 +173,12 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		return $value;
 	}
 
+	/**
+	 * Change any field values prior to output
+	 * @param  string $property The name of the property to change
+	 * @param  string $value    The original value of the property. Passed by
+	 *                          reference, and will be modified in the function.
+	 */
 	private function modifyValue($property, &$value)
 	{
 		switch ($property) {
@@ -190,6 +196,10 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		}
 	}
 
+	/**
+	 * Set any extra fields to the JSON output that aren't already set by
+	 * Drupal via fields/entity properties
+	 */
 	private function setAdditionalFields()
 	{
 		// Set Contributor IDs
@@ -206,9 +216,19 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		}
 	}
 
+	/**
+	 * Get the URL of an a_nnotate document corresponding to a local file
+	 * @param  integer $fid
+	 * @return string      The a_nnotate URL
+	 */
 	private function getAnnotateURL($fid)
 	{
 		if (!module_exists('a_nnotate')) return FALSE;
+
+		$a_nnotate_sync = new A_nnotate_sync_records;
+		if (!$a_nnotate_sync->get_sync_record_from_fid($fid)) {
+			return FALSE;
+		}
 
 		//Get the Sync Record (with A.nnotate Document ID)
 		$sync_rec = _a_nnotate_sync_entity($fid);
@@ -222,6 +242,7 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 			$user_email = $user->mail;
 		}
 
+		// c and d are part of a_nnotate's odd multi-valued unique identifier
 		$c = $sync_rec->aid->c;
 		$d = $sync_rec->aid->d;
 		$annotate_user = a_nnotate_obj('config')->annotate_owner_username;
