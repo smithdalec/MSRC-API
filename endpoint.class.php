@@ -77,8 +77,13 @@ class MSRCEndpointHelper {
 	 */
 	protected function getDrupalField($JSON_field)
 	{
-		$flipped_map = array_flip($this->fieldMap);
-		return $flipped_map[$JSON_field];
+		foreach ($this->fieldMap as $set => $fields) {
+			$fields_arr = (array) $fields;
+			$flipped_map = array_flip($fields_arr);
+			if (isset($flipped_map[$JSON_field])) {
+				return $flipped_map[$JSON_field];
+			}
+		}
 	}
 }
 
@@ -299,16 +304,19 @@ class MSRCListHelper extends MSRCEndpointHelper {
 	private function getQueryParams()
 	{
 		$query_params = drupal_get_query_parameters();
+		$drupalized_params = array();
 		$fields = field_info_fields();
 
 		// We don't want non-existent fields in our query, or exceptions will be thrown
 		foreach($query_params as $field => $value) {
-			if (!isset($fields[$field])) {
-				unset($query_params[$field]);
+			$drupal_field = $this->getDrupalField($field);
+			if (isset($fields[$drupal_field])) {
+				$drupalized_params[$drupal_field] = $value;
+			} else {
 				$this->errors[] = 'Invalid field: ' . $field;
 			}
 		}
 
-		return $query_params;
+		return $drupalized_params;
 	}
 }
