@@ -125,10 +125,14 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 				$value = $this->getValue($this->wrapper->$drupal_field->value());
 				if ($value) {
 					$this->modifyValue($json_field, $value);
-					$this->data[$field_type][$json_field] = $value;
+					$mapped_data[$field_type][$json_field] = $value;
 				}
 			}
 		}
+
+		// Set the data structure
+		$this->data['record'] = $mapped_data['record'];
+		$this->data['record']['document'] = $mapped_data['document'];
 
 		$this->setAdditionalFields();
 
@@ -194,7 +198,9 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 			case 'endDate':
 				$value = date('Y-m-d\TG:i:sP', $value);
 				break;
-
+			case 'id':
+				$value = 'http://msrc.idiginfo.org/documents/' . $value;
+				break;
 			default:
 				# code...
 				break;
@@ -209,24 +215,36 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 	{
 		// Set Contributor IDs
 		foreach($this->wrapper->biblio_primary_contributors as $contributor) {
-			$this->data['record']['creators'][] = $contributor->cid->value();
+			$cid = $contributor->cid->value();
+			$creator = 'http://msrc.idiginfo.org/creators/' . $cid;
+			$this->data['record']['creators'][] = $creator;
 		}
 
 		// Set A.nnotate URL
 		$attachment = $this->wrapper->field_attatchment->value();
 		$attach_set = isset($attachment[0]['fid']);
 		if ($attachment && $attach_set && $fid = $attachment[0]['fid']) {
-			if ($url = $this->getAnnotateURL($fid))
+			if ($url = $this->getAnnotateID($fid))
 			$this->data['record']['annotations'] = $url;
 		}
+
+		// Set Document ID
+		if ($doi = $this->wrapper->biblio_doi->value()) {
+			$id = 'doi:' . $doi;
+		} else {
+			$bid = $this->wrapper->bid->value();
+			$id = 'http://msrc.idiginfo.org/documents/' . $bid . '/pub';
+		}
+		$this->data['record']['document']['id']  = $id;
 	}
 
 	/**
-	 * Get the URL of an a_nnotate document corresponding to a local file
+	 * Get the multi-valued id of an a_nnotate document corresponding to a local
+	 * file
 	 * @param  integer $fid
-	 * @return string      The a_nnotate URL
+	 * @return array      The a_nnotate ID, keyed by c and d
 	 */
-	private function getAnnotateURL($fid)
+	private function getAnnotateID($fid)
 	{
 		if (!module_exists('a_nnotate')) return FALSE;
 
@@ -238,30 +256,8 @@ class MSRCSingleRecordHelper extends MSRCEndpointHelper {
 		//Get the Sync Record (with A.nnotate Document ID)
 		$sync_rec = _a_nnotate_sync_entity($fid);
 
-		//Get the user for which to Annotate the document
-		if (a_nnotate_obj('config')->user_sync_mode == 'single_user') {
-			$user_email = a_nnotate_obj('config')->user_sync_single_user;
-		}
-		else {
-			global $user;
-			$user_email = $user->mail;
-		}
-
 		// c and d are part of a_nnotate's odd multi-valued unique identifier
-		$c = $sync_rec->aid->c;
-		$d = $sync_rec->aid->d;
-		$annotate_user = a_nnotate_obj('config')->annotate_owner_username;
-		$aac = a_nnotate_obj('actions')
-			->get_anonymous_access_code($c, $d, $annotate_user);
-		$params = array(
-			'c'        => $c,
-			'd'        => $d,
-			'asig'     => $user_email,
-			'aac'      => $aac,
-		);
-		$url = a_nnotate_obj('config')->api_url . 'pdfnotate.php?';
-		$query_string = a_nnotate_obj('client')->url_serialize($params);
-		return $url . $query_string;
+		return array('c' => $sync_rec->aid->c, 'd' => $sync_rec->aid->d);
 	}
 }
 

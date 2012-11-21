@@ -1,6 +1,6 @@
 {
     "record": {
-        "bid": "msrcID",
+        "bid": "id",
         "publication_type": "documentType",
         "created": "created",
         "changed": "changed",
@@ -8,7 +8,6 @@
         "field_attatchment": "attachment",
         "field_category": "category",
         "field_end_date": "endDate",
-        "field_mesh": "meshTerms",
         "field_methods_section": "methodsSection",
         "field_open_access": "openAccess",
         "field_pop_status": "populationStatus",
@@ -23,7 +22,6 @@
         "biblio_title": "title",
         "biblio_pmid": "pmid",
         "biblio_year": "year",
-        "biblio_primary_contributors": "authorList",
         "biblio_secondary_contributors": "editorList",
         "biblio_title_secondary": "journalTitle",
         "biblio_accession_number": "accessionNumber",
@@ -45,7 +43,6 @@
         "biblio_lang": "language",
         "biblio_abst_e": "abstract",
         "biblio_abst_f": "frenchAbstract",
-        "biblio_keywords": "keywords",
         "biblio_url": "url",
         "biblio_notes": "notes",
         "biblio_research_notes": "researchNotes",
@@ -62,6 +59,9 @@
         "biblio_remote_db_provider": "remoteDbProvider",
         "biblio_label": "label",
         "biblio_refereed": "refereedDesignation",
-        "biblio_full_text": "fullText"
+        "biblio_full_text": "fullText",
+        "biblio_primary_contributors": "authorList",
+        "biblio_keywords": "keywords",
+        "field_mesh": "meshTerms"
     }
 }
